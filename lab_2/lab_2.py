@@ -106,7 +106,7 @@ if __name__ == '__main__':
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
-    z_dim = 64
+    z_dim = 16
     mnist_dim = train_dataset.train_data.size(1) * train_dataset.train_data.size(2)
 
     G = Generator(g_input_dim=z_dim, g_output_dim=mnist_dim).to(device)
@@ -116,9 +116,10 @@ if __name__ == '__main__':
     criterion = nn.BCELoss()
 
     # optimizer
-    lr = 0.0002
-    G_optimizer = optim.Adam(G.parameters(), lr=lr)
-    D_optimizer = optim.Adam(D.parameters(), lr=lr)
+    G_lr = 0.0002
+    D_lr = 0.0002
+    G_optimizer = optim.Adam(G.parameters(), lr=G_lr)
+    D_optimizer = optim.Adam(D.parameters(), lr=D_lr)
 
     n_epoch = 200
     for epoch in range(1, n_epoch + 1):

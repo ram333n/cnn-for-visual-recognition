@@ -70,7 +70,7 @@ def D_train(x, G, D, z_dim, criterion, D_optimizer):
     D_output = D(x_real)
     D_real_loss = criterion(D_output, y_real)
 
-    # train discriminator on facke
+    # train discriminator on fake
     z = torch.randn(batch_size, z_dim).to(device)
 
     with torch.no_grad():
@@ -148,5 +148,3 @@ if __name__ == '__main__':
             os.makedirs('./results', exist_ok=True)
             # Save the generated torch tensor models to disk
             save_image(generated_images, f'./results/gen_img{epoch}.png')
-
-

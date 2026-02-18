@@ -128,7 +128,9 @@ if __name__ == '__main__':
             x = x.to(device)
 
             D_losses.append(D_train(x, G, D, z_dim, criterion, D_optimizer))
-            G_losses.append(G_train(G, D, batch_size, z_dim, criterion, G_optimizer))
+
+            if batch_idx % 2 == 0:
+                G_losses.append(G_train(G, D, batch_size, z_dim, criterion, G_optimizer))
 
         print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % (
             (epoch), n_epoch, torch.mean(torch.FloatTensor(D_losses)), torch.mean(torch.FloatTensor(G_losses))))

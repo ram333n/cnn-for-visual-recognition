@@ -106,7 +106,7 @@ if __name__ == '__main__':
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
-    z_dim = 16
+    z_dim = 64
     mnist_dim = train_dataset.train_data.size(1) * train_dataset.train_data.size(2)
 
     G = Generator(g_input_dim=z_dim, g_output_dim=mnist_dim).to(device)

@@ -32,7 +32,7 @@ def seed_everything(seed: int) -> None:
 
 def collate_fn(batch):
     # batch: List[(image, target)]
-    images, targets, _ = zip(*batch)
+    images, targets = zip(*batch)
     return list(images), list(targets)
 
 
@@ -59,12 +59,12 @@ class ArTaxOrVoTTDataset(Dataset):
         samples: List[Sample],
         class_to_idx: Dict[str, int],
         train: bool = True,
-        hflip_p: float = 0.5,
+        vflip_p: float = 0.5,
     ):
         self.samples = samples
         self.class_to_idx = class_to_idx
         self.train = train
-        self.hflip_p = hflip_p
+        self.vflip_p = vflip_p
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -84,15 +84,16 @@ class ArTaxOrVoTTDataset(Dataset):
             top = float(bb["top"])
             width = float(bb["width"])
             height = float(bb["height"])
-            x1, y1 = left, top
-            x2, y2 = left + height, top + width
+
+            x_min, y_min = left, top
+            x_max, y_max = left + width, top + height
 
             tag_list = reg.get("tags", []) or []
             label_name = tag_list[0] if len(tag_list) > 0 else fallback_label
             if label_name not in self.class_to_idx:
                 label_name = fallback_label
 
-            boxes.append([x1, y2, x2, y1])
+            boxes.append([x_min, y_min, x_max, y_max])
             labels.append(self.class_to_idx[label_name])
 
         if len(boxes) == 0:
@@ -108,12 +109,12 @@ class ArTaxOrVoTTDataset(Dataset):
         img_path = s.image_path.parent / img_name
 
         img = Image.open(img_path).convert("RGB")
-        h, w = img.size
+        w, h = img.size
 
         boxes, labels = self._read_target(s.ann_path, fallback_label=s.order_name)
 
         # Basic augmentation: vertical flip
-        if self.train and random.random() < self.hflip_p:
+        if self.train and random.random() < self.vflip_p:
             img = F.vflip(img)
             boxes[:, [1, 3]] = torch.tensor([h, h], dtype=torch.float32) - boxes[:, [3, 1]]
 
@@ -179,11 +180,7 @@ class ArTaxOrDataModule(pl.LightningDataModule):
     def setup(self, stage: str | None = None) -> None:
         artaxor_root = self.data_dir / "ArTaxOr"
         if not artaxor_root.exists():
-            # Sometimes users point directly at ArTaxOr
-            if (self.data_dir / "annotation").exists():
-                artaxor_root = self.data_dir
-            else:
-                raise FileNotFoundError(f"Expected ArTaxOr folder under {self.data_dir}")
+            artaxor_root = self.data_dir
 
         orders = self._discover_orders(artaxor_root)
         self.class_to_idx = {name: i + 1 for i, name in enumerate(orders)}
@@ -191,14 +188,31 @@ class ArTaxOrDataModule(pl.LightningDataModule):
 
         all_samples = self._build_samples(artaxor_root, orders)
 
-        rng = random.Random(self.seed)
-        rng.shuffle(all_samples)
-        n_val = max(1, int(len(all_samples) * self.val_split))
-        val_samples = all_samples[:n_val]
-        train_samples = all_samples[n_val:]
+        train_samples, val_samples = self._split_with_stratification(all_samples)
 
         self.train_ds = ArTaxOrVoTTDataset(train_samples, self.class_to_idx, train=True)
         self.val_ds = ArTaxOrVoTTDataset(val_samples, self.class_to_idx, train=False)
+
+    def _split_with_stratification(self, samples: List[Sample]) -> Tuple[List[Sample], List[Sample]]:
+        grouped_samples = {}
+        for sample in samples:
+            if sample.order_name not in grouped_samples:
+                grouped_samples[sample.order_name] = []
+
+            grouped_samples[sample.order_name].append(sample)
+
+        train_samples: List[Sample] = []
+        val_samples: List[Sample] = []
+
+        rng = random.Random(self.seed)
+
+        for order_name, group in grouped_samples.items():
+            rng.shuffle(group)
+            n_val = int(len(group) * self.val_split)
+            val_samples.extend(group[:n_val])
+            train_samples.extend(group[n_val:])
+
+        return train_samples, val_samples
 
     def train_dataloader(self) -> DataLoader:
         assert self.train_ds is not None
@@ -274,15 +288,15 @@ class FasterRCNNLit(pl.LightningModule):
     def configure_optimizers(self):
         params = [p for p in self.model.parameters() if p.requires_grad]
         opt = torch.optim.AdamW(params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay)
-        sch = torch.optim.lr_scheduler.StepLR(opt, step_size=5, gamma=0.01)
+        sch = torch.optim.lr_scheduler.StepLR(opt, step_size=5, gamma=0.1)
         return {"optimizer": opt, "lr_scheduler": sch}
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", type=str, required=True, help="Path containing ArTaxOr/...")
+    parser.add_argument("--data_dir", type=str, default="./ArTaxOr", help="Path containing ArTaxOr/...")
     parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--num_workers", type=int, default=4)
+    parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--val_split", type=float, default=0.1)
     parser.add_argument("--max_epochs", type=int, default=20)
     parser.add_argument("--lr", type=float, default=1e-6)

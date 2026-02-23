@@ -216,3 +216,5 @@ __marimo__/
 .streamlit/secrets.toml
 
 lab_2/mnist_data
+lab_3/ArTaxOr
+lab_3/lightning_logs

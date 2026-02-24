@@ -116,7 +116,7 @@ if __name__ == '__main__':
     criterion = nn.BCELoss()
 
     # optimizer
-    G_lr = 0.0002
+    G_lr = 0.00002
     D_lr = 0.0002
     G_optimizer = optim.Adam(G.parameters(), lr=G_lr)
     D_optimizer = optim.Adam(D.parameters(), lr=D_lr)
@@ -124,13 +124,6 @@ if __name__ == '__main__':
     n_epoch = 200
     for epoch in range(1, n_epoch + 1):
         D_losses, G_losses = [], []
-
-        if epoch == 5:
-            G_lr = 1e-5
-
-            for param_group in G_optimizer.param_groups:
-                param_group['lr'] = G_lr
-
         for batch_idx, (x, _) in enumerate(train_loader):
             x = x.to(device)
 

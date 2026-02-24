@@ -60,11 +60,13 @@ class ArTaxOrVoTTDataset(Dataset):
         class_to_idx: Dict[str, int],
         train: bool = True,
         vflip_p: float = 0.5,
+        target_size: Tuple[int, int] = (800, 800)
     ):
         self.samples = samples
         self.class_to_idx = class_to_idx
         self.train = train
         self.vflip_p = vflip_p
+        self.target_size = target_size
 
     def __len__(self) -> int:
         return len(self.samples)
@@ -113,14 +115,23 @@ class ArTaxOrVoTTDataset(Dataset):
 
         boxes, labels = self._read_target(s.ann_path, fallback_label=s.order_name)
 
+        new_w, new_h = self.target_size
+
+        img = F.to_tensor(img)
+        img = F.resize(img, [new_h, new_w])
+
+        scale_x = new_w / w
+        scale_y = new_h / h
+        boxes[:, 0::2] = boxes[:, 0::2] * scale_x
+        boxes[:, 1::2] = boxes[:, 1::2] * scale_y
+
         # Basic augmentation: vertical flip
         if self.train and random.random() < self.vflip_p:
             img = F.vflip(img)
-            boxes[:, [1, 3]] = torch.tensor([h, h], dtype=torch.float32) - boxes[:, [3, 1]]
+            boxes[:, [1, 3]] = torch.tensor([new_h, new_h], dtype=torch.float32) - boxes[:, [3, 1]]
 
-        img_t = F.to_tensor(img)
-        boxes[:, 0::2] = boxes[:, 0::2].clamp(0, w)
-        boxes[:, 1::2] = boxes[:, 1::2].clamp(0, h)
+        boxes[:, 0::2] = boxes[:, 0::2].clamp(0, new_w)
+        boxes[:, 1::2] = boxes[:, 1::2].clamp(0, new_h)
 
         target: Dict[str, Tensor] = {
             "boxes": boxes,
@@ -129,7 +140,7 @@ class ArTaxOrVoTTDataset(Dataset):
             "area": (boxes[:, 2] - boxes[:, 0]).clamp(min=0) * (boxes[:, 3] - boxes[:, 1]).clamp(min=0),
             "iscrowd": torch.zeros((boxes.shape[0],), dtype=torch.int64),
         }
-        return img_t, target
+        return img, target
 
 
 class ArTaxOrDataModule(pl.LightningDataModule):

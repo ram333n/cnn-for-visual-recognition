@@ -59,3 +59,4 @@ images, targets, _ = zip(*batch)
 
 8. Small `gamma` hyperparameter in `StepLR`
 9. Increase `lr` to `1e-4`
+10. Incorrect `map_50` usage in `ModelCheckpoint` filename

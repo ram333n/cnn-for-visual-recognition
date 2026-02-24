@@ -124,13 +124,18 @@ if __name__ == '__main__':
     n_epoch = 200
     for epoch in range(1, n_epoch + 1):
         D_losses, G_losses = [], []
+
+        if epoch == 5:
+            G_lr = 1e-5
+
+            for param_group in G_optimizer.param_groups:
+                param_group['lr'] = G_lr
+
         for batch_idx, (x, _) in enumerate(train_loader):
             x = x.to(device)
 
             D_losses.append(D_train(x, G, D, z_dim, criterion, D_optimizer))
-
-            if batch_idx % 2 == 0:
-                G_losses.append(G_train(G, D, batch_size, z_dim, criterion, G_optimizer))
+            G_losses.append(G_train(G, D, batch_size, z_dim, criterion, G_optimizer))
 
         print('[%d/%d]: loss_d: %.3f, loss_g: %.3f' % (
             (epoch), n_epoch, torch.mean(torch.FloatTensor(D_losses)), torch.mean(torch.FloatTensor(G_losses))))
